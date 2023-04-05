@@ -4,11 +4,14 @@ use App\Helpers\Response;
 
 require_once 'loader.php';
 
+if( !verificationStatus() ) {
+    return Response::make(0);
+}
+
 try {
     $instance = PasswordResetForToken();
     $user = UserForToken();
-    if( !$user || !$instance )
-    {
+    if( !$user || !$instance ) {
         throw new Exception("invalid_link");
     }
 } catch(Exception $exception) {

@@ -8,17 +8,17 @@ use Illuminate\Support\Facades\Date as date;
 /**
  * Class User
  *
- * @property       string $app_token
- * @property-read  string $created_at         {@type date}
- * @property       string $email
- * @property       string $email2
- * @property-read  string $email2_verified_at {@type date}
- * @property-read  string $email_verified_at  {@type date}
- * @property-read  int    $id
- * @property string       $password
- * @property       string $remember_token
- * @property       string $session
- * @property-read  string $updated_at         {@type date}
+ * @property       string                         $app_token
+ * @property-read  string|\Carbon\CarbonInterface $created_at         {@type date}
+ * @property       string                         $email
+ * @property       string                         $email2
+ * @property-read  string                         $email2_verified_at {@type date}
+ * @property-read  string                         $email_verified_at  {@type date}
+ * @property-read  int                            $id
+ * @property string                               $password
+ * @property       string                         $remember_token
+ * @property       string                         $session
+ * @property-read  string                         $updated_at         {@type date}
  *
  */
 class User extends AbstractModel
@@ -55,7 +55,34 @@ class User extends AbstractModel
         'password',
     ];
 
-    protected static function boot()
+    public static function deleteUnverified(): void
+    {
+        if( verificationStatus() ) {
+            User::query()
+                ->where('created_at', "<", verifySubMinutes())
+                ->where(fn($q) => $q->whereNull('email_verified_at')->orWhereNull('email2_verified_at'))
+                ->get()
+                ->each
+                ->delete();
+        }
+    }
+
+    /**
+     * @param string|array $email
+     *
+     * @return void
+     */
+    public static function deleteUnverifiedByEmail($email): void
+    {
+        static::query()
+              ->whereIn('email', array_wrap($email))
+              ->where(fn($q) => $q->whereNull('email_verified_at')->orWhereNull('email2_verified_at'))
+              ->get()
+            ->each
+            ->delete();
+    }
+
+    protected static function boot(): void
     {
         parent::boot();
         parent::deleting(function(User $user) {
@@ -65,12 +92,12 @@ class User extends AbstractModel
         });
     }
 
-    public function sessions()
+    public function sessions(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(Session::class);
     }
 
-    public function password_resets()
+    public function password_resets(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(PasswordReset::class);
     }
@@ -94,7 +121,7 @@ class User extends AbstractModel
     /**
      * @return \App\Models\Session
      */
-    public function getSession()
+    public function getSession(): Session
     {
         return $this->sessions()->forMe($this->id)->firstOr(fn() => $this->createNewSeesion());
     }
@@ -102,7 +129,7 @@ class User extends AbstractModel
     /**
      * @return false|\Illuminate\Database\Eloquent\Model
      */
-    public function createNewSeesion()
+    public function createNewSeesion(): \Illuminate\Database\Eloquent\Model|bool
     {
         return $this->sessions()->save(Session::makeSession($this->id));
     }
@@ -110,7 +137,7 @@ class User extends AbstractModel
     /**
      * @return bool|null
      */
-    public function deleteSession()
+    public function deleteSession(): ?bool
     {
         return $this->getSession()->delete();
     }
@@ -118,7 +145,7 @@ class User extends AbstractModel
     /**
      * @return bool|null
      */
-    public function deleteSessions()
+    public function deleteSessions(): ?bool
     {
         return $this->sessions()->delete();
     }
@@ -147,12 +174,12 @@ class User extends AbstractModel
         return empty($email) ? null : $email;
     }
 
-    public function scopeByEmail(Builder $builder, $email)
+    public function scopeByEmail(Builder $builder, $email): Builder
     {
         return $builder->whereIn('email', array_wrap($email));
     }
 
-    public function scopeByEmail2(Builder $builder, $email)
+    public function scopeByEmail2(Builder $builder, $email): Builder
     {
         return $builder->whereIn('email2', array_wrap($email));
     }
@@ -162,7 +189,7 @@ class User extends AbstractModel
      *
      * @return bool
      */
-    public function hasVerifiedEmail()
+    public function hasVerifiedEmail(): bool
     {
         return !is_null($this->email_verified_at) && (
                 $this->email2 && !is_null($this->email2_verified_at) || !$this->email2
@@ -174,7 +201,7 @@ class User extends AbstractModel
      *
      * @return bool
      */
-    public function markEmailAsVerified(string $column = null)
+    public function markEmailAsVerified(string $column = null): bool
     {
         $data = [];
         if( $column ) {
@@ -196,11 +223,10 @@ class User extends AbstractModel
             }
         }
 
-        if( !$this->email2 )
-        {
+        if( !$this->email2 ) {
             $data[ 'email2_verified_at' ] = $this->freshTimestamp();
         }
-        
+
         return $this->forceFill($data)->save();
     }
 
@@ -214,6 +240,7 @@ class User extends AbstractModel
 
         $title = $title ?: __('Verify Email Address');
         $email = $password_reset?->email;
+
         return mailer(
             config('app.name', "Site") . ' - ' . $title . ' - ' . $email,
             $message ?: fn($data) => view('mail', $data),
@@ -226,12 +253,12 @@ class User extends AbstractModel
     }
 
     /**
-     * @param string|null $title
+     * @param string|null          $title
      * @param string|\Closure|null $message
      *
      * @return \Bootstrap\Container\Application|\Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
      */
-    public function viewEmailVerification($token = null)
+    public function viewEmailVerification($token = null): \Illuminate\Contracts\View\View|\Illuminate\Contracts\View\Factory|\Bootstrap\Container\Application
     {
         $email = $this->getEmailForVerification();
 
@@ -243,5 +270,12 @@ class User extends AbstractModel
                             $this->email,
             'hash' => $token,
         ]);
+    }
+
+    public function isPast(): bool
+    {
+        return $this->created_at
+            ->addMinutes(config('mail.verification.expire', 60))
+            ->isPast();
     }
 }

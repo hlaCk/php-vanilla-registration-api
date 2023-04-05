@@ -4,6 +4,7 @@ use App\Helpers\Response;
 use App\Models\PasswordReset;
 use App\Models\Session;
 use Illuminate\Contracts\Routing\UrlGenerator;
+use Illuminate\Support\Facades\Config;
 
 if( !function_exists('request') ) {
     /**
@@ -27,19 +28,6 @@ if( !function_exists('request') ) {
         $value = app('request')->__get($key);
 
         return is_null($value) ? value($default) : $value;
-    }
-}
-
-if( !function_exists('currentUser') ) {
-    /**
-     * @return \App\Models\User|null
-     */
-    function currentUser()
-    {
-        /** @var \App\Models\Session $session */
-        $session = Session::forToken()->first();
-
-        return $session?->user()->with('sessions')->first();
     }
 }
 
@@ -74,6 +62,76 @@ if (! function_exists('asset')) {
     function asset($path, $secure = null)
     {
         return app('url')->asset($path, $secure);
+    }
+}
+
+if( !function_exists('__') ) {
+    /**
+     * Translate the given message.
+     *
+     * @param string|null $key
+     * @param array       $replace
+     * @param string|null $locale
+     *
+     * @return string|array|null
+     */
+    function __($key = null, $replace = [], $locale = null)
+    {
+        if( is_null($key) ) {
+            return $key;
+        }
+
+        return trans($key, $replace, $locale);
+    }
+}
+
+if( !function_exists('trans') ) {
+    /**
+     * Translate the given message.
+     *
+     * @param string|null $key
+     * @param array       $replace
+     * @param string|null $locale
+     *
+     * @return \Illuminate\Contracts\Translation\Translator|string|array|null
+     */
+    function trans($key = null, $replace = [], $locale = null)
+    {
+        if( is_null($key) ) {
+            return app('translator');
+        }
+
+        return app('translator')->get($key, $replace, $locale);
+    }
+}
+
+if( !function_exists('trans_choice') ) {
+    /**
+     * Translates the given message based on a count.
+     *
+     * @param string               $key
+     * @param \Countable|int|array $number
+     * @param array                $replace
+     * @param string|null          $locale
+     *
+     * @return string
+     */
+    function trans_choice($key, $number, array $replace = [], $locale = null)
+    {
+        return app('translator')->choice($key, $number, $replace, $locale);
+    }
+}
+
+if( !function_exists('currentUser') ) {
+    /**
+     * @return \App\Models\User|null
+     */
+    function currentUser()
+    {
+        /** @var \App\Models\Session $session */
+        $session = Session::forToken()->first();
+
+        return $session?->user()->with('sessions')->first();
     }
 }
 
@@ -133,59 +191,12 @@ if( !function_exists('UserForToken') ) {
     }
 }
 
-if( !function_exists('__') ) {
+if( !function_exists('verificationStatus') ) {
     /**
-     * Translate the given message.
-     *
-     * @param string|null $key
-     * @param array       $replace
-     * @param string|null $locale
-     *
-     * @return string|array|null
+     * @return bool
      */
-    function __($key = null, $replace = [], $locale = null)
+    function verificationStatus(): bool
     {
-        if( is_null($key) ) {
-            return $key;
-        }
-
-        return trans($key, $replace, $locale);
-    }
-}
-
-if( !function_exists('trans') ) {
-    /**
-     * Translate the given message.
-     *
-     * @param string|null $key
-     * @param array       $replace
-     * @param string|null $locale
-     *
-     * @return \Illuminate\Contracts\Translation\Translator|string|array|null
-     */
-    function trans($key = null, $replace = [], $locale = null)
-    {
-        if( is_null($key) ) {
-            return app('translator');
-        }
-
-        return app('translator')->get($key, $replace, $locale);
-    }
-}
-
-if( !function_exists('trans_choice') ) {
-    /**
-     * Translates the given message based on a count.
-     *
-     * @param string               $key
-     * @param \Countable|int|array $number
-     * @param array                $replace
-     * @param string|null          $locale
-     *
-     * @return string
-     */
-    function trans_choice($key, $number, array $replace = [], $locale = null)
-    {
-        return app('translator')->choice($key, $number, $replace, $locale);
+        return (boolean) Config::get('mail.verification.status', false);
     }
 }

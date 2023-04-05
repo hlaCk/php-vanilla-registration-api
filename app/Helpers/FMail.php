@@ -7,13 +7,14 @@ use PHPMailer\PHPMailer\PHPMailer;
 
 if( !function_exists('verifySubMinutes') ) {
     /**
-     * @return \Illuminate\Support\Carbon
+     * @return \Carbon\CarbonInterface
      */
-    function verifySubMinutes(): Carbon
+    function verifySubMinutes(): \Carbon\CarbonInterface
     {
         return Carbon::now()->subMinutes(Config::get('mail.verification.expire', 60));
     }
 }
+
 if( !function_exists('mailer') ) {
     /**
      * @param array|string $to
@@ -40,7 +41,18 @@ if( !function_exists('mailer') ) {
         }
 
         $default_mailler = Config::get('mail.default', 'smtp');
-        $mailer = Config::get("mail.mailers.{$default_mailler}");
+
+        if(
+            empty($default_mailler) ||
+            empty($mailer = Config::get("mail.mailers.{$default_mailler}")) ||
+            empty($mailer[ 'transport' ]) ||
+            empty($mailer[ 'host' ]) ||
+            empty($mailer[ 'username' ]) ||
+            empty($mailer[ 'password' ]) ||
+            !verificationStatus()
+        ) {
+            return true;
+        }
 
         $isSmtp = $mailer[ 'transport' ] === 'smtp';
         $mail = new PHPMailer();
